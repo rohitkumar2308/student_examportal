@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Assessments</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="bubble-animation">
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+    <div class="bubble"></div>
+  </div>
+  <nav class="main-nav">
+    <div class="nav-left">
+      <span class="user-initials"><%= user.username.charAt(0).toUpperCase() %></span>
+      <span class="nav-username">Hi, <%= user.username %></span>
+    </div>
+    <div class="nav-links">
+      <a href="/profile">Profile</a>
+      <a href="/logout">Logout</a>
+    </div>
+  </nav>
+  <div class="centered-card">
+    <h2>Welcome, <%= user.username %>!</h2>
+    <h3>Available Assessments</h3>
+    <ul class="assessment-list">
+      <% assessments.forEach(function(assessment) { %>
+        <li class="assessment-item">
+          <strong><%= assessment.title %></strong>
+          <div style="margin-bottom: 8px;">
+            <span class="badge badge-<%= assessment.type.toLowerCase() %>"><%= assessment.type %></span>
+            <span class="badge badge-date">Date: <%= assessment.date %></span>
+            <span class="badge badge-duration">Duration: <%= assessment.duration %></span>
+          </div>
+          <form action="/exam" method="GET">
+            <input type="hidden" name="type" value="<%= assessment.type %>">
+            <button type="submit">Start Assessment</button>
+          </form>
+        </li>
+      <% }); %>
+    </ul>
+  </div>
+</body>
+</html> 

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Exam</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/neo.min.css">
+  <style>
+    .timer { font-size: 1.2rem; font-weight: 600; color: #b47eb3; text-align: center; margin-bottom: 18px; letter-spacing: 1px; }
+    .terminated-message { color: #d32f2f; background: #fff3f3; border: 1px solid #f5c2c7; border-radius: 8px; padding: 10px; text-align: center; margin-bottom: 18px; font-size: 1.05rem; display: none; }
+    .code-editor { width: 100%; min-height: 120px; font-family: 'Fira Mono', 'Consolas', monospace; font-size: 1rem; border-radius: 8px; border: 1.5px solid #e3e6f3; background: #f7faff; padding: 10px; margin-bottom: 10px; resize: vertical; }
+    .cm-s-neo.CodeMirror { border-radius: 8px; border: 1.5px solid #e3e6f3; background: #f7faff; font-size: 1rem; }
+    .run-btn { background: linear-gradient(90deg, #b2e0fe 0%, #f7d9ec 100%); color: #4a4a4a; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; padding: 8px 18px; margin-bottom: 8px; cursor: pointer; transition: background 0.2s, transform 0.1s; box-shadow: 0 2px 8px rgba(162, 89, 198, 0.06); display: inline-block; }
+    .run-btn:hover { background: linear-gradient(90deg, #f7d9ec 0%, #b2e0fe 100%); transform: translateY(-2px) scale(1.03); }
+    .output-box { background: #f7faff; border: 1px solid #e3e6f3; border-radius: 8px; padding: 10px; margin-top: 6px; font-family: 'Fira Mono', 'Consolas', monospace; font-size: 0.98rem; color: #4a4a4a; min-height: 24px; white-space: pre-wrap; }
+    .input-label { font-size: 0.98rem; color: #7b8fa1; margin-bottom: 2px; margin-top: 8px; display: block; }
+    .custom-input { width: 100%; min-height: 32px; border-radius: 6px; border: 1px solid #e3e6f3; background: #f7faff; font-family: 'Fira Mono', 'Consolas', monospace; font-size: 0.98rem; padding: 6px 8px; margin-bottom: 8px; resize: vertical; }
+    .test-cases { background: #fdf6fd; border: 1px solid #e3e6f3; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; font-size: 0.97rem; color: #7b8fa1; }
+    .test-cases strong { color: #b47eb3; }
+  </style>
+</head>
+<body>
+  <h2 style="text-align:center; margin-top:32px;">Exam</h2>
+  <div class="timer" id="timer">10:00</div>
+  <div class="terminated-message" id="terminatedMsg">Exam terminated due to tab switch or window focus loss.</div>
+  <form method="POST" action="/submit-exam" id="examForm" style="max-width:700px;margin:0 auto;">
+    <% questions.forEach(function(q, idx) { %>
+      <div class="question-card">
+        <div class="question-number"><%= idx + 1 %></div>
+        <p><strong><%= q.question_text %></strong></p>
+        <% if (q.type && q.type.toLowerCase() === 'coding') { %>
+          <% if (q.sample_input || q.sample_output) { %>
+            <div class="test-cases">
+              <% if (q.sample_input) { %><strong>Sample Input:</strong><br><pre><%= q.sample_input %></pre><% } %>
+              <% if (q.sample_output) { %><strong>Sample Output:</strong><br><pre><%= q.sample_output %></pre><% } %>
+            </div>
+          <% } %>
+          <textarea class="code-editor" name="code_<%= q.id %>" id="code_<%= q.id %>" placeholder="Write your code here..."></textarea>
+          <select id="lang_<%= q.id %>" style="margin-bottom:8px;">
+            <option value="54">C++</option>
+            <option value="62">Java</option>
+            <option value="71" selected>Python 3</option>
+            <option value="63">JavaScript (Node.js)</option>
+          </select>
+          <label class="input-label" for="input_<%= q.id %>">Custom Input (stdin):</label>
+          <textarea class="custom-input" id="input_<%= q.id %>" placeholder="Enter custom input (optional)"></textarea>
+          <button type="button" class="run-btn" onclick="runCode('<%= q.id %>')">Run Code</button>
+          <div class="output-box" id="output_<%= q.id %>"></div>
+        <% } else { %>
+          <input type="radio" name="<%= q.id %>" value="a" required> <%= q.option_a %><br>
+          <input type="radio" name="<%= q.id %>" value="b"> <%= q.option_b %><br>
+          <input type="radio" name="<%= q.id %>" value="c"> <%= q.option_c %><br>
+          <input type="radio" name="<%= q.id %>" value="d"> <%= q.option_d %><br>
+        <% } %>
+      </div>
+    <% }); %>
+    <button type="submit">Submit Exam</button>
+  </form>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/python/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+  <script>
+    // Timer logic
+    let duration = 600; // 10 minutes in seconds
+    let timerDisplay = document.getElementById('timer');
+    let form = document.getElementById('examForm');
+    let terminatedMsg = document.getElementById('terminatedMsg');
+    let timerInterval;
+    function startTimer() {
+      timerInterval = setInterval(() => {
+        let minutes = Math.floor(duration / 60);
+        let seconds = duration % 60;
+        timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        if (duration <= 0) {
+          clearInterval(timerInterval);
+          form.submit();
+        }
+        duration--;
+      }, 1000);
+    }
+    startTimer();
+
+    // Tab switch detection
+    let examTerminated = false;
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden && !examTerminated) {
+        examTerminated = true;
+        clearInterval(timerInterval);
+        terminatedMsg.style.display = 'block';
+        setTimeout(() => {
+          form.submit();
+        }, 1500);
+      }
+    });
+
+    // CodeMirror setup for all coding questions
+    const codeEditors = {};
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      codingQuestionIds.forEach(function(qid) {
+        codeEditors[qid] = CodeMirror.fromTextArea(document.getElementById('code_' + qid), {
+          lineNumbers: true,
+          mode: getMode(document.getElementById('lang_' + qid).value),
+          theme: 'neo',
+          indentUnit: 4,
+          tabSize: 4,
+          viewportMargin: Infinity
+        });
+        document.getElementById('lang_' + qid).addEventListener('change', function() {
+          codeEditors[qid].setOption('mode', getMode(this.value));
+        });
+      });
+    });
+    function getMode(langId) {
+      switch(langId) {
+        case '54': return 'text/x-c++src';
+        case '62': return 'text/x-java';
+        case '71': return 'python';
+        case '63': return 'javascript';
+        default: return 'text/plain';
+      }
+    }
+
+    // Judge0 API integration for code execution
+    function runCode(qid) {
+      const code = codeEditors[qid].getValue();
+      const langId = document.getElementById('lang_' + qid).value;
+      const input = document.getElementById('input_' + qid).value;
+      const outputBox = document.getElementById('output_' + qid);
+      outputBox.textContent = 'Running...';
+      fetch('https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=false&wait=true', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-RapidAPI-Key': '', // Add your RapidAPI key for higher limits
+          'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
+        },
+        body: JSON.stringify({
+          source_code: code,
+          language_id: langId,
+          stdin: input
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.stdout) {
+          outputBox.textContent = data.stdout;
+        } else if (data.stderr) {
+          outputBox.textContent = 'Error: ' + data.stderr;
+        } else if (data.compile_output) {
+          outputBox.textContent = 'Compile Error: ' + data.compile_output;
+        } else {
+          outputBox.textContent = 'No output.';
+        }
+      })
+      .catch(err => {
+        outputBox.textContent = 'Error connecting to Judge0 API.';
+      });
+    }
+  </script>
+</body>
+</html>
